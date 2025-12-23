@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OPEN桑 營運中樞</title>
+    
+    <!-- 1. 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. 載入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- 3. 載入 Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- 4. 載入 LINE LIFF SDK -->
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #e2e8f0; /* Outer Background (Desktop) */
+            -webkit-tap-highlight-color: transparent;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* Custom Animation */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.33); }
+            80%, 100% { opacity: 0; }
+        }
+        .ring-animate::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0;
+            display: block;
+            width: 100%; height: 100%;
+            background-color: inherit;
+            border-radius: 50%;
+            animation: pulse-ring 1.25s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+            z-index: -1;
+        }
+        /* Fade In Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        /* Modal Animation */
+        @keyframes modalPop {
+            0% { opacity: 0; transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .modal-content {
+            animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // ==========================================
+        // 🔹 Icons Components
+        // ==========================================
+        const IconBase = ({ size = 24, className = "", children }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {children}
+            </svg>
+        );
+
+        const RefreshCw = (props) => <IconBase {...props}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></IconBase>;
+        const WifiOff = (props) => <IconBase {...props}><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></IconBase>;
+        const User = (props) => <IconBase {...props}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></IconBase>;
+        const Bug = (props) => <IconBase {...props}><rect width="8" height="14" x="8" y="6" rx="4"/><path d="m19 7-3 2"/><path d="m5 7 3 2"/><path d="m19 19-3-2"/><path d="m5 19 3-2"/><path d="M20 13h-4"/><path d="M4 13h4"/><path d="m10 4 1 2"/><path d="m14 4-1 2"/></IconBase>;
+        const Play = (props) => <IconBase {...props}><polygon points="5 3 19 12 5 21 5 3"/></IconBase>;
+        const FileText = (props) => <IconBase {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></IconBase>;
+        const Activity = (props) => <IconBase {...props}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></IconBase>;
+        const PieChart = (props) => <IconBase {...props}><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></IconBase>;
+        const Trash2 = (props) => <IconBase {...props}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconBase>;
+        const Database = (props) => <IconBase {...props}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></IconBase>;
+        const Calculator = (props) => <IconBase {...props}><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></IconBase>;
+        const DollarSign = (props) => <IconBase {...props}><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></IconBase>;
+        const Save = (props) => <IconBase {...props}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></IconBase>;
+        const AlertCircle = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></IconBase>;
+
+        // ==========================================
+        // 🔹 主程式 App
+        // ==========================================
+        const App = () => {
+            // ⚙️ 設定區域
+            // 日誌監控用的 Webhook
+            const LOGS_WEBHOOK_URL = "https://ez2.zeabur.app/webhook/cd8e734a-9c48-4339-9ecf-cb098758e0e0"; 
+            // 控制按鈕用的 Webhook
+            const CONTROL_WEBHOOK_URL = "https://ez2.zeabur.app/webhook/b899c52d-09c0-49b2-8e84-ad818ab7b8b5";
+
+            const API_KEY = "yHEgVMncPY1p5oVLkJPfXQEPFPB3tQcAEKJcAMnFjv6sMTVtRPiEQzfkiU2uFimJRNsDaL3jEDxqnA3bMAszv9KqM0ns0cUJpLq0";
+            // ✅ 更新為新的 LIFF ID
+            const LIFF_ID = "2008745394-ZtBvDo4C"; 
+            
+            // ✅ 預設開啟 LIFF 模式
+            const ENABLE_LIFF = true; 
+
+            const [loading, setLoading] = useState(false);
+            const [activeTab, setActiveTab] = useState('monitor'); // 'monitor' (日誌) | 'control' (啟動)
+
+            // LIFF 狀態
+            const [liffError, setLiffError] = useState(null);
+            const [userProfile, setUserProfile] = useState(null);
+            const [isLiffInit, setIsLiffInit] = useState(false);
+            
+            // 爬蟲監控狀態
+            const [crawlStatus, setCrawlStatus] = useState('idle'); // idle, running, completed
+            const [crawlTime, setCrawlTime] = useState(0);
+            const [crawlLogs, setCrawlLogs] = useState([]);
+            const [crawlStats, setCrawlStats] = useState(null);
+            
+            // 錯誤訊息狀態 (用於 Control Tab)
+            const [statusMessage, setStatusMessage] = useState('待命');
+            const [statusColor, setStatusColor] = useState('text-slate-200');
+
+            // Modal 狀態
+            const [modalConfig, setModalConfig] = useState({ isOpen: false, title: "", action: null });
+
+            // Refs
+            const pollingRef = useRef(null);
+            const timerRef = useRef(null);
+            const startTimeRef = useRef(null);
+
+            // 定義 7 個按鈕的配置 (Action 使用 1~7 對應後端分流)
+            const ACTION_BUTTONS = [
+                { id: 'master', label: '總開關 (執行全部)', icon: Play, action: 1, color: 'from-indigo-600 to-purple-600' },
+                { id: 'clear', label: '清空舊資料', icon: Trash2, action: 2, color: 'bg-white text-slate-600 border border-slate-200' },
+                { id: 'start_crawl', label: '啟動爬蟲', icon: Bug, action: 3, color: 'bg-white text-slate-600 border border-slate-200' },
+                { id: 'calc_pr', label: '計算飯店PR值', icon: Calculator, action: 4, color: 'bg-white text-slate-600 border border-slate-200' },
+                { id: 'calc_heat', label: '計算城市熱度', icon: Activity, action: 5, color: 'bg-white text-slate-600 border border-slate-200' },
+                { id: 'write_price', label: '寫入最低&最高價', icon: DollarSign, action: 6, color: 'bg-white text-slate-600 border border-slate-200' },
+                { id: 'backup', label: '啟動備份', icon: Save, action: 7, color: 'bg-white text-slate-600 border border-slate-200' },
+            ];
+
+            // 初始化 LIFF
+            useEffect(() => {
+                const initLiff = async () => {
+                    if (!ENABLE_LIFF) {
+                        setTimeout(() => {
+                            setUserProfile({
+                                userId: "U74612ac96b6bcf1bb5aa78ff03544fdb",
+                                displayName: "測試管理員",
+                                pictureUrl: null
+                            });
+                            setIsLiffInit(true);
+                        }, 300);
+                        return;
+                    }
+
+                    try {
+                        if (!window.liff) throw new Error("LIFF SDK 未載入");
+                        await window.liff.init({ liffId: LIFF_ID });
+                        if (window.liff.isLoggedIn()) {
+                            setUserProfile(await window.liff.getProfile());
+                        } else {
+                            window.liff.isInClient() ? setLiffError("無法取得使用者資訊") : window.liff.login();
+                        }
+                        setIsLiffInit(true);
+                    } catch (err) {
+                        setLiffError(err.message);
+                        setIsLiffInit(true);
+                    }
+                };
+                initLiff();
+            }, []);
+
+            // 初始載入日誌 & 切換分頁時同步更新
+            useEffect(() => {
+                if (isLiffInit) {
+                    fetchCrawlerLogs();
+                }
+            }, [isLiffInit, activeTab]);
+
+            // ==========================================
+            // 🔹 爬蟲監控邏輯
+            // ==========================================
+            
+            // 處理按鈕點擊 -> 開啟 Modal
+            const handleActionClick = (btn) => {
+                if (crawlStatus === 'running') return; // 防止重複執行
+                setModalConfig({
+                    isOpen: true,
+                    title: btn.label,
+                    action: btn.action
+                });
+            };
+
+            // 確認執行 -> 發送 API (使用 POST)
+            const confirmExecution = async () => {
+                setModalConfig({ ...modalConfig, isOpen: false });
+                
+                if (crawlStatus === 'running') return;
+                
+                setCrawlStatus('running');
+                setLoading(true);
+                setStatusMessage('🚀 指令發送中...');
+                setStatusColor('text-blue-300');
+                
+                try {
+                    // 準備 Payload，包含 action 與 userId
+                    const payload = { 
+                        action: modalConfig.action,
+                        userId: userProfile?.userId || 'unknown' // 傳送 Line User ID
+                    };
+
+                    const response = await fetch(CONTROL_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 
+                            'X-App-only-OPEN': API_KEY,
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'omit', 
+                        body: JSON.stringify(payload) 
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`啟動失敗: ${response.status} ${response.statusText}`);
+                    }
+                    
+                    setStatusMessage('✅ 指令已送出，等待回應...');
+                    setStatusColor('text-emerald-300');
+
+                    // 啟動後開始計時與輪詢
+                    startPolling();
+                    
+                } catch (err) {
+                    console.error("Trigger Error:", err);
+                    setStatusMessage(`❌ 錯誤: ${err.message === 'Failed to fetch' ? '連線被拒 (CORS/網路)' : err.message}`);
+                    setStatusColor('text-red-400');
+                    setCrawlStatus('idle');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // 獲取日誌 (使用 GET) - 使用 LOGS Webhook
+            const fetchCrawlerLogs = async () => {
+                try {
+                    // 使用 GET 請求，並加入 timestamp 防止快取
+                    const response = await fetch(`${LOGS_WEBHOOK_URL}?t=${new Date().getTime()}`, {
+                        method: 'GET',
+                        headers: { 
+                            'X-App-only-OPEN': API_KEY,
+                            'Content-Type': 'application/json' 
+                        },
+                        credentials: 'omit'
+                    });
+
+                    if (!response.ok) throw new Error("Fetch Logs Error");
+                    const rawData = await response.json();
+
+                    if (Array.isArray(rawData)) {
+                        const logs = rawData.filter(item => item.id).sort((a, b) => b.id - a.id);
+                        const stats = rawData.find(item => item.target_count !== undefined);
+
+                        const formattedLogs = logs.map(l => ({
+                            id: l.id,
+                            source: "n8n Crawler",
+                            message: l.msg,
+                            status: getStatusFromMsg(l.msg),
+                            time: l.time.split(' ')[1] 
+                        }));
+
+                        setCrawlLogs(formattedLogs);
+                        setCrawlStats(stats);
+                        
+                        // 更新 Control Tab 的狀態顯示 (顯示最新一則日誌)
+                        if (formattedLogs.length > 0 && crawlStatus !== 'running') {
+                            setStatusMessage(formattedLogs[0].message);
+                            setStatusColor('text-white');
+                        }
+                        
+                        // 自動判斷是否完成
+                        if (formattedLogs.length > 0) {
+                            const latestLog = formattedLogs[0];
+                            if (latestLog.message.includes("完畢") || latestLog.message.includes("結束")) {
+                                if (crawlStatus === 'running') finishCrawler();
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error("Fetch Logs Error", err);
+                }
+            };
+
+            const getStatusFromMsg = (msg) => {
+                if (msg.includes("開始")) return "start";
+                if (msg.includes("結束") || msg.includes("完畢")) return "success";
+                if (msg.includes("清空")) return "warning";
+                return "info";
+            };
+
+            const startPolling = () => {
+                startTimeRef.current = Date.now();
+                setCrawlTime(0);
+                timerRef.current = setInterval(() => {
+                    setCrawlTime((Date.now() - startTimeRef.current) / 1000);
+                }, 100);
+
+                fetchCrawlerLogs();
+                pollingRef.current = setInterval(fetchCrawlerLogs, 2000);
+            };
+
+            const finishCrawler = () => {
+                if (timerRef.current) clearInterval(timerRef.current);
+                if (pollingRef.current) clearInterval(pollingRef.current);
+                setCrawlStatus('completed');
+                setStatusColor('text-emerald-300');
+            };
+
+            useEffect(() => {
+                return () => {
+                    if (timerRef.current) clearInterval(timerRef.current);
+                    if (pollingRef.current) clearInterval(pollingRef.current);
+                };
+            }, []);
+
+            if (!isLiffInit) return (
+                <div className="min-h-screen bg-slate-200 flex items-center justify-center">
+                    <div className="bg-white p-8 rounded-3xl shadow-xl flex flex-col items-center gap-4">
+                        <div className="w-12 h-12 border-4 border-slate-200 border-t-emerald-500 rounded-full animate-spin"></div>
+                        <p className="text-slate-500 font-medium animate-pulse">正在連接 LINE...</p>
+                    </div>
+                </div>
+            );
+
+            return (
+                /* 窄版手機版面容器 */
+                <div className="min-h-screen w-full flex justify-center items-start sm:py-10">
+                    <div className="w-full max-w-md bg-slate-100 min-h-screen sm:min-h-[850px] sm:h-auto sm:rounded-[2.5rem] shadow-2xl relative overflow-hidden ring-8 ring-slate-900/5 font-sans text-slate-800">
+                        
+                        {/* Header */}
+                        <div className="bg-slate-900 text-white p-6 pb-8 rounded-b-[2.5rem] shadow-lg z-10 sticky top-0">
+                            <div className="flex justify-between items-center mb-4">
+                                <div>
+                                    <span className="text-slate-400 text-xs font-bold tracking-widest uppercase">Open-san Dashboard</span>
+                                    <h1 className="text-xl font-bold flex items-center gap-2 mt-1">
+                                        爬蟲監控中樞
+                                        <div className={`w-2 h-2 rounded-full ${loading || crawlStatus === 'running' ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'}`}></div>
+                                    </h1>
+                                </div>
+                                <div className="w-9 h-9 rounded-full border border-slate-600 overflow-hidden bg-slate-800">
+                                    {userProfile?.pictureUrl ? <img src={userProfile.pictureUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><User size={18}/></div>}
+                                </div>
+                            </div>
+
+                            {/* Tabs Navigation */}
+                            <div className="flex p-1 bg-slate-800 rounded-xl">
+                                <button onClick={() => setActiveTab('monitor')} className={`flex-1 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${activeTab === 'monitor' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>
+                                    <FileText size={16} /> 監控日誌
+                                </button>
+                                <button onClick={() => setActiveTab('control')} className={`flex-1 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${activeTab === 'control' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>
+                                    <Play size={16} /> 啟動任務
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Content Area - 修正 Padding */}
+                        <div className="px-5 pt-10 pb-20 -mt-6 z-0">
+                            
+                            {/* 錯誤訊息 */}
+                            {(liffError) && (
+                                <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-xs rounded-r flex items-center gap-2">
+                                    <WifiOff size={16} />
+                                    <span>{liffError}</span>
+                                </div>
+                            )}
+
+                            {/* === TAB 1: 監控日誌 (Monitor) === */}
+                            {activeTab === 'monitor' && (
+                                <div className="animate-fade-in space-y-4">
+                                    
+                                    {/* 1. 統計摘要卡片 (Stats Summary) */}
+                                    {crawlStats && (
+                                        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden mb-2">
+                                            <div className="absolute top-0 right-0 p-3 opacity-5 pointer-events-none">
+                                                <PieChart size={80} />
+                                            </div>
+                                            <div className="relative z-10">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">本次執行結果</span>
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${crawlStats.ratio < 0.05 ? 'bg-emerald-100 text-emerald-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                                                        {crawlStats.ratio < 0.05 ? '健康' : '偏高'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-3xl font-bold text-slate-800">{crawlStats.percentage}</span>
+                                                    <span className="text-xs text-slate-400">尚未開放</span>
+                                                </div>
+                                                <div className="mt-3 flex gap-4 border-t border-slate-50 pt-3">
+                                                    <div>
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase">目標數量</p>
+                                                        <p className="text-sm font-bold text-indigo-600">{crawlStats.target_count.toLocaleString()}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase">總樣本</p>
+                                                        <p className="text-sm font-bold text-slate-600">{crawlStats.denominator.toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between items-center px-1">
+                                        <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">最新執行紀錄</span>
+                                        <button onClick={fetchCrawlerLogs} className="text-slate-400 hover:text-slate-600 active:scale-90 transition-transform"><RefreshCw size={14} /></button>
+                                    </div>
+
+                                    {crawlLogs.length === 0 ? (
+                                        <div className="text-center py-12 text-slate-300 bg-white rounded-2xl border border-slate-200 border-dashed">
+                                            <Bug size={32} className="mx-auto mb-2 opacity-50" />
+                                            <p className="text-xs">尚無紀錄</p>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                                            {crawlLogs.map((log) => (
+                                                <div key={log.id} className="p-4 border-b border-slate-50 last:border-0 flex items-start gap-3">
+                                                    <div className={`w-2.5 h-2.5 mt-2 rounded-full shrink-0 ${
+                                                        log.status === 'success' ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]' : 
+                                                        log.status === 'start' ? 'bg-blue-400' : 
+                                                        log.status === 'warning' ? 'bg-red-400' : 'bg-slate-300'
+                                                    }`}></div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex justify-between items-start mb-1">
+                                                            <p className={`text-base font-bold leading-tight ${
+                                                                log.status === 'success' ? 'text-emerald-700' : 
+                                                                log.status === 'start' ? 'text-blue-700' : 
+                                                                log.status === 'warning' ? 'text-red-700' : 'text-slate-700'
+                                                            }`}>{log.message}</p>
+                                                            <span className="text-xs text-slate-500 font-mono bg-slate-100 px-2 py-1 rounded ml-2 shrink-0">{log.time}</span>
+                                                        </div>
+                                                        <p className="text-xs text-slate-400 font-mono">ID: {log.id}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* === TAB 2: 啟動任務 (Control) === */}
+                            {activeTab === 'control' && (
+                                <div className="animate-fade-in space-y-6">
+                                    
+                                    {/* 狀態卡片 */}
+                                    <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
+                                        <div className="absolute -top-4 -right-4 text-slate-800 opacity-20"><Activity size={140} /></div>
+                                        <div className="relative z-10 flex justify-between items-end">
+                                            <div className="w-full">
+                                                <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">目前狀態</span>
+                                                {/* Modified: Display dynamic status message or error */}
+                                                <div className={`text-xl font-bold mt-2 leading-snug break-words pr-2 ${statusColor}`}>
+                                                    {crawlStatus === 'running' ? `⏱ ${crawlTime.toFixed(1)}s` : statusMessage}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 按鈕群組 */}
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center px-1">
+                                            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">任務控制面板</span>
+                                        </div>
+
+                                        {/* 總開關 */}
+                                        <button 
+                                            onClick={() => handleActionClick(ACTION_BUTTONS[0])}
+                                            disabled={crawlStatus === 'running'}
+                                            className={`w-full py-4 rounded-2xl font-bold text-lg text-white shadow-lg flex items-center justify-center gap-2 bg-gradient-to-r ${ACTION_BUTTONS[0].color} active:scale-95 transition-transform ${crawlStatus === 'running' ? 'opacity-50 cursor-not-allowed' : 'hover:brightness-110'}`}
+                                        >
+                                            <Play size={24} fill="currentColor" />
+                                            {ACTION_BUTTONS[0].label}
+                                        </button>
+
+                                        {/* 子任務 Grid */}
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {ACTION_BUTTONS.slice(1).map((btn) => (
+                                                <button
+                                                    key={btn.id}
+                                                    onClick={() => handleActionClick(btn)}
+                                                    disabled={crawlStatus === 'running'}
+                                                    className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-2 shadow-sm font-bold text-sm active:scale-95 transition-transform ${btn.color} ${crawlStatus === 'running' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'}`}
+                                                >
+                                                    <btn.icon size={24} className="text-slate-400" />
+                                                    {btn.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="text-center text-slate-400 text-xs px-4 pb-10">
+                                        <p>點擊按鈕後需確認才執行。</p>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+
+                        {/* Confirmation Modal */}
+                        {modalConfig.isOpen && (
+                            <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+                                <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl modal-content">
+                                    <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-4 mx-auto">
+                                        <AlertCircle size={28} />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-center text-slate-800 mb-2">確認執行任務？</h3>
+                                    <p className="text-sm text-slate-500 text-center mb-6">
+                                        您即將執行 <span className="font-bold text-indigo-600">「{modalConfig.title}」</span><br/>
+                                        確定要繼續嗎？
+                                    </p>
+                                    <div className="flex gap-3">
+                                        <button 
+                                            onClick={() => setModalConfig({ ...modalConfig, isOpen: false })}
+                                            className="flex-1 py-3 rounded-xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors"
+                                        >
+                                            取消
+                                        </button>
+                                        <button 
+                                            onClick={confirmExecution}
+                                            className="flex-1 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+                                        >
+                                            確定執行
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
