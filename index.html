@@ -237,7 +237,7 @@
 
                 try {
                     const payload = { 
-                        env: 'all', // 🔥 改為請求全部
+                        env: 'all', 
                         userId: liffState.profile?.userId || 'unknown'
                     };
 
@@ -254,24 +254,29 @@
                     
                     const json = await res.json();
                     
-                    // 預期回傳格式：{ prod: {...}, dev: {...} }
-                    // 如果後端還沒改，可能需要做防呆處理
-                    if (json.prod || json.dev) {
+                    // 🔥 更新後的接收邏輯：處理陣列格式 [正式, 個人]
+                    if (Array.isArray(json) && json.length >= 2) {
+                        setAllData({
+                            prod: json[0], // 第一筆
+                            dev: json[1]   // 第二筆
+                        });
+                    } else if (Array.isArray(json) && json.length === 1) {
+                        // 防呆：若只有一筆，優先給 Prod
+                        setAllData(prev => ({ ...prev, prod: json[0] }));
+                    } else if (json.prod || json.dev) {
+                        // 保留對舊格式物件的相容性
                         setAllData(prev => ({
                             prod: json.prod || prev.prod,
                             dev: json.dev || prev.dev
                         }));
                     } else {
-                        // 相容舊格式 (假設只回傳了單一物件，暫時塞給 prod)
-                        const singleData = Array.isArray(json) ? json[0] : json;
-                        setAllData(prev => ({ ...prev, prod: singleData }));
+                        console.warn("未知的資料格式:", json);
                     }
 
                     setLastUpdate(new Date());
 
                 } catch (err) {
                     console.error("Fetch Error:", err);
-                    // 設定錯誤狀態
                     setAllData(prev => ({
                         prod: { ...prev.prod, status: 'error' },
                         dev: { ...prev.dev, status: 'error' }
@@ -369,24 +374,3 @@
     </script>
 </body>
 </html>
-```
-
-### 💡 重要：您的 n8n 後端需要做的修改
-
-因為前端現在發送的是 `env: 'all'`，請確保您的 n8n 流程能處理這個參數。建議將 n8n 回傳的 JSON 結構調整為：
-
-```json
-{
-  "prod": {
-    "used_bytes": 123456,
-    "limit_bytes": 524288000,
-    "percentage": 1.5,
-    "status": "ok"
-  },
-  "dev": {
-    "used_bytes": 987654,
-    "limit_bytes": 524288000,
-    "percentage": 80.5,
-    "status": "ok"
-  }
-}
