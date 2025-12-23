@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DB Health Monitor</title>
+    <title>OPEN桑 資料庫監控中心</title>
     
     <!-- 1. 載入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -313,7 +313,7 @@
                                 <div>
                                     <span className="text-slate-400 text-xs font-bold tracking-widest uppercase flex items-center gap-1">
                                         <div className={`w-2 h-2 rounded-full ${loading ? 'bg-yellow-400 animate-pulse' : 'bg-emerald-400'}`}></div>
-                                        System Monitor
+                                        北海道OPEN桑
                                     </span>
                                     <h1 className="text-xl font-bold mt-1">資料庫監控中心</h1>
                                 </div>
@@ -333,7 +333,7 @@
                             
                             {/* 1. 正式環境卡片 */}
                             <EnvCard 
-                                title="正式環境 (Prod)" 
+                                title="正式環境" 
                                 icon={Briefcase} 
                                 data={allData.prod} 
                                 formatBytes={formatBytes} 
@@ -341,7 +341,7 @@
 
                             {/* 2. 個人用環境卡片 */}
                             <EnvCard 
-                                title="個人用途 (Dev)" 
+                                title="個人用途" 
                                 icon={User} 
                                 data={allData.dev} 
                                 formatBytes={formatBytes} 
@@ -374,3 +374,4 @@
     </script>
 </body>
 </html>
+
